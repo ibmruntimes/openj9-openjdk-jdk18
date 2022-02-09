@@ -364,7 +364,11 @@ public class Platform {
      * Returns absolute path to directory containing JVM shared library.
      */
     public static Path jvmLibDir() {
-        return libDir().resolve(variant());
+        if (isJ9()) {
+            return libDir().resolve("default");
+	} else {
+            return libDir().resolve(variant());
+        }
     }
 
     private static String variant() {
