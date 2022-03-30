@@ -42,7 +42,7 @@ import java.lang.invoke.MethodType;
 
 /**
  * For the AIX PPC64 C ABI specifically, this class uses the ProgrammableInvoker API
- * which is turned into a MethodHandle to invoke the native code in downcall.
+ * which is turned into a MethodHandle to invoke the native code.
  */
 public class CallArranger {
 
@@ -54,6 +54,6 @@ public class CallArranger {
 
 	/* Replace ProgrammableUpcallHandler in OpenJDK with the implementation of ProgrammableUpcallHandler specific to OpenJ9 */
 	public static NativeSymbol arrangeUpcall(MethodHandle target, MethodType mt, FunctionDescriptor cDesc, ResourceScope scope) {
-		throw new InternalError("arrangeUpcall is not yet implemented"); //$NON-NLS-1$
+		return ProgrammableUpcallHandler.makeUpcall(target, mt, cDesc, scope);
 	}
 }
