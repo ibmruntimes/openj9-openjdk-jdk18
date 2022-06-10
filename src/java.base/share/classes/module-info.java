@@ -23,6 +23,12 @@
  * questions.
  */
 
+/*
+ * ===========================================================================
+ * (c) Copyright IBM Corp. 2022, 2022 All Rights Reserved
+ * ===========================================================================
+ */
+
 /**
  * Defines the foundational APIs of the Java SE Platform.
  *
@@ -141,6 +147,8 @@ module java.base {
         jdk.incubator.foreign;
     exports com.sun.security.ntlm to
         java.security.sasl;
+    exports jdk.crypto.jniprovider to
+        jdk.crypto.ec;
     exports jdk.internal.javac to
         java.compiler,
         jdk.compiler,
