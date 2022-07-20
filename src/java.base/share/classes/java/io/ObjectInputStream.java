@@ -32,11 +32,9 @@
 package java.io;
 
 import java.io.ObjectInputFilter.Config;
-import java.io.ObjectStreamClass.WeakClassKey;
 import java.io.ObjectStreamClass.RecordSupport;
 import java.lang.System.Logger;
 import java.lang.invoke.MethodHandle;
-import java.lang.ref.ReferenceQueue;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Modifier;
@@ -49,10 +47,6 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
-import static java.io.ObjectStreamClass.processQueue;
 
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.event.DeserializationEvent;
@@ -288,12 +282,13 @@ public class ObjectInputStream
 
     private static class Caches {
         /** cache of subclass security audit results */
-        static final ConcurrentMap<WeakClassKey,Boolean> subclassAudits =
-            new ConcurrentHashMap<>();
-
-        /** queue for WeakReferences to audited subclasses */
-        static final ReferenceQueue<Class<?>> subclassAuditsQueue =
-            new ReferenceQueue<>();
+        static final ClassValue<Boolean> subclassAudits =
+            new ClassValue<>() {
+                @Override
+                protected Boolean computeValue(Class<?> type) {
+                    return auditSubclass(type);
+                }
+            };
 
         /**
          * Property to permit setting a filter after objects
@@ -386,15 +381,12 @@ public class ObjectInputStream
      * read* requests
      */
 
-    /* ClassByNameCache Entry for caching class.forName results upon enableClassCaching */
-    private static final ClassByNameCache classByNameCache;
-    private static final boolean isClassCachingEnabled;
-    static {
-        isClassCachingEnabled =
+    @SuppressWarnings("removal")
+    private static final boolean isClassCachingEnabled =
             AccessController.doPrivileged(new GetClassCachingSettingAction());
-        classByNameCache = (isClassCachingEnabled ? new ClassByNameCache() : null);
-    }
-  
+    /* ClassByNameCache Entry for caching class.forName results upon enableClassCaching */
+    private static final ClassByNameCache classByNameCache =
+            isClassCachingEnabled ? new ClassByNameCache() : null;
 
     /** if true LUDCL/forName results would be cached, true by default starting Java8 */
     private static final class GetClassCachingSettingAction
@@ -547,12 +539,12 @@ public class ObjectInputStream
      * latestUserDefinedLoader().
      *
      * @throws  ClassNotFoundException if the class of a serialized object
-     * 	   could not be found.
+     *     could not be found.
      * @throws  IOException if an I/O error occurs.
      *
      */
 
-    private static Object redirectedReadObject(ObjectInputStream iStream, Class caller)
+    private static Object redirectedReadObject(ObjectInputStream iStream, Class<?> caller)
             throws ClassNotFoundException, IOException
     {
         return iStream.readObject(Object.class, caller);
@@ -590,7 +582,7 @@ public class ObjectInputStream
      * @throws  ClassNotFoundException Class of a serialized object cannot be
      *          found.
      */
-    private final Object readObject(Class<?> type, Class caller)
+    private final Object readObject(Class<?> type, Class<?> caller)
         throws IOException, ClassNotFoundException
     {
         if (enableOverride) {
@@ -601,9 +593,9 @@ public class ObjectInputStream
             throw new AssertionError("internal error");
 
         ClassLoader oldCachedLudcl = null;
-	    boolean setCached = false;
-	
-	    if (((null == curContext) || refreshLudcl) && (isClassCachingEnabled)) {
+        boolean setCached = false;
+
+        if (((null == curContext) || refreshLudcl) && isClassCachingEnabled) {
             oldCachedLudcl = cachedLudcl;
 
             // If caller is not provided, follow the standard path to get the cachedLudcl.
@@ -611,7 +603,7 @@ public class ObjectInputStream
 
             if (caller == null) {
                  cachedLudcl = latestUserDefinedLoader();
-            }else{
+            } else {
                  cachedLudcl = caller.getClassLoader();
             }
 
@@ -727,9 +719,9 @@ public class ObjectInputStream
     public Object readUnshared() throws IOException, ClassNotFoundException {
 
         ClassLoader oldCachedLudcl = null;
-        boolean setCached = false; 
+        boolean setCached = false;
 
-        if (((null == curContext) || refreshLudcl) && (isClassCachingEnabled)) {
+        if (((null == curContext) || refreshLudcl) && isClassCachingEnabled) {
             oldCachedLudcl = cachedLudcl;
             cachedLudcl = latestUserDefinedLoader();
             setCached = true;
@@ -1763,13 +1755,7 @@ public class ObjectInputStream
         if (sm == null) {
             return;
         }
-        processQueue(Caches.subclassAuditsQueue, Caches.subclassAudits);
-        WeakClassKey key = new WeakClassKey(cl, Caches.subclassAuditsQueue);
-        Boolean result = Caches.subclassAudits.get(key);
-        if (result == null) {
-            result = auditSubclass(cl);
-            Caches.subclassAudits.putIfAbsent(key, result);
-        }
+        boolean result = Caches.subclassAudits.get(cl);
         if (!result) {
             sm.checkPermission(SUBCLASS_IMPLEMENTATION_PERMISSION);
         }
