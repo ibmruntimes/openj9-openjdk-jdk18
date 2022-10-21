@@ -136,7 +136,7 @@ public class CallArranger {
 
     /* Replace ProgrammableUpcallHandler in OpenJDK with the implementation of ProgrammableUpcallHandler specific to OpenJ9 */
     public static NativeSymbol arrangeUpcall(MethodHandle target, MethodType mt, FunctionDescriptor cDesc, ResourceScope scope) {
-        throw new InternalError("arrangeUpcall is not yet implemented"); //$NON-NLS-1$
+        return ProgrammableUpcallHandler.makeUpcall(target, mt, cDesc, scope);
     }
 
     private static boolean isInMemoryReturn(Optional<MemoryLayout> returnLayout) {
